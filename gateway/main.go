@@ -29,7 +29,7 @@ func main() {
 	log.Println("connected to redis")
 
 	minioStorage, err := storage.NewMinIOStorage(
-		cfg.MinIOEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIOBucket, cfg.MinIOUseSSL,
+		cfg.MinIOEndpoint, cfg.MinIOPublicEndpoint, cfg.MinIOAccessKey, cfg.MinIOSecretKey, cfg.MinIOBucket, cfg.MinIOUseSSL,
 	)
 	if err != nil {
 		log.Fatalf("failed to create minio client: %v", err)

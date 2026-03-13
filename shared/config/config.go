@@ -8,8 +8,9 @@ import (
 
 type Config struct {
 	RedisAddr        string
-	MinIOEndpoint    string
-	MinIOAccessKey   string
+	MinIOEndpoint       string
+	MinIOPublicEndpoint string
+	MinIOAccessKey      string
 	MinIOSecretKey   string
 	MinIOBucket      string
 	MinIOUseSSL      bool
@@ -27,8 +28,9 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		RedisAddr:        getEnv("REDIS_ADDR", "redis:6379"),
-		MinIOEndpoint:    getEnv("MINIO_ENDPOINT", "minio:9000"),
-		MinIOAccessKey:   getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+		MinIOEndpoint:       getEnv("MINIO_ENDPOINT", "minio:9000"),
+		MinIOPublicEndpoint: getEnv("MINIO_PUBLIC_ENDPOINT", "localhost:9000"),
+		MinIOAccessKey:      getEnv("MINIO_ACCESS_KEY", "minioadmin"),
 		MinIOSecretKey:   getEnv("MINIO_SECRET_KEY", "minioadmin"),
 		MinIOBucket:      getEnv("MINIO_BUCKET", "media-pipeline"),
 		MinIOUseSSL:      getEnvBool("MINIO_USE_SSL", false),

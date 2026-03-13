@@ -11,12 +11,13 @@ import (
 )
 
 type MinIOStorage struct {
-	client   *minio.Client
-	bucket   string
-	endpoint string
+	client         *minio.Client
+	bucket         string
+	endpoint       string
+	publicEndpoint string
 }
 
-func NewMinIOStorage(endpoint, accessKey, secretKey, bucket string, useSSL bool) (*MinIOStorage, error) {
+func NewMinIOStorage(endpoint, publicEndpoint, accessKey, secretKey, bucket string, useSSL bool) (*MinIOStorage, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: useSSL,
@@ -24,7 +25,10 @@ func NewMinIOStorage(endpoint, accessKey, secretKey, bucket string, useSSL bool)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create minio client: %w", err)
 	}
-	return &MinIOStorage{client: client, bucket: bucket, endpoint: endpoint}, nil
+	if publicEndpoint == "" {
+		publicEndpoint = endpoint
+	}
+	return &MinIOStorage{client: client, bucket: bucket, endpoint: endpoint, publicEndpoint: publicEndpoint}, nil
 }
 
 func (s *MinIOStorage) EnsureBucket(ctx context.Context) error {
@@ -45,7 +49,7 @@ func (s *MinIOStorage) GenerateUploadURL(ctx context.Context, objectKey string, 
 	if err != nil {
 		return "", fmt.Errorf("failed to generate upload url: %w", err)
 	}
-	return presignedURL.String(), nil
+	return s.toPublicURL(presignedURL), nil
 }
 
 func (s *MinIOStorage) GenerateDownloadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
@@ -54,7 +58,14 @@ func (s *MinIOStorage) GenerateDownloadURL(ctx context.Context, objectKey string
 	if err != nil {
 		return "", fmt.Errorf("failed to generate download url: %w", err)
 	}
-	return presignedURL.String(), nil
+	return s.toPublicURL(presignedURL), nil
+}
+
+func (s *MinIOStorage) toPublicURL(u *url.URL) string {
+	if s.publicEndpoint != s.endpoint {
+		u.Host = s.publicEndpoint
+	}
+	return u.String()
 }
 
 func (s *MinIOStorage) ObjectExists(ctx context.Context, objectKey string) (bool, error) {

@@ -53,6 +53,22 @@ func main() {
 
 	hb := heartbeat.New(redisClient, cfg.WorkerID, cfg.HeartbeatInterval)
 
+	go func() {
+		ticker := time.NewTicker(cfg.HeartbeatInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				redisClient.ZAdd(ctx, "workers:active", redis.Z{
+					Score:  float64(time.Now().Unix()),
+					Member: cfg.WorkerID,
+				})
+			}
+		}
+	}() 
+
 	log.Printf("[%s] waiting for jobs...", cfg.WorkerID)
 	for {
 		select {
