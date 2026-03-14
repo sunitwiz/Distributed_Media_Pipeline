@@ -11,10 +11,9 @@ import (
 )
 
 type MinIOStorage struct {
-	client         *minio.Client
-	bucket         string
-	endpoint       string
-	publicEndpoint string
+	client       *minio.Client
+	presigner    *minio.Client
+	bucket       string
 }
 
 func NewMinIOStorage(endpoint, publicEndpoint, accessKey, secretKey, bucket string, useSSL bool) (*MinIOStorage, error) {
@@ -28,7 +27,15 @@ func NewMinIOStorage(endpoint, publicEndpoint, accessKey, secretKey, bucket stri
 	if publicEndpoint == "" {
 		publicEndpoint = endpoint
 	}
-	return &MinIOStorage{client: client, bucket: bucket, endpoint: endpoint, publicEndpoint: publicEndpoint}, nil
+	presigner, err := minio.New(publicEndpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure: useSSL,
+		Region: "us-east-1",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create presigner client: %w", err)
+	}
+	return &MinIOStorage{client: client, presigner: presigner, bucket: bucket}, nil
 }
 
 func (s *MinIOStorage) EnsureBucket(ctx context.Context) error {
@@ -45,27 +52,20 @@ func (s *MinIOStorage) EnsureBucket(ctx context.Context) error {
 }
 
 func (s *MinIOStorage) GenerateUploadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
-	presignedURL, err := s.client.PresignedPutObject(ctx, s.bucket, objectKey, expiry)
+	presignedURL, err := s.presigner.PresignedPutObject(ctx, s.bucket, objectKey, expiry)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate upload url: %w", err)
 	}
-	return s.toPublicURL(presignedURL), nil
+	return presignedURL.String(), nil
 }
 
 func (s *MinIOStorage) GenerateDownloadURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	reqParams := make(url.Values)
-	presignedURL, err := s.client.PresignedGetObject(ctx, s.bucket, objectKey, expiry, reqParams)
+	presignedURL, err := s.presigner.PresignedGetObject(ctx, s.bucket, objectKey, expiry, reqParams)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate download url: %w", err)
 	}
-	return s.toPublicURL(presignedURL), nil
-}
-
-func (s *MinIOStorage) toPublicURL(u *url.URL) string {
-	if s.publicEndpoint != s.endpoint {
-		u.Host = s.publicEndpoint
-	}
-	return u.String()
+	return presignedURL.String(), nil
 }
 
 func (s *MinIOStorage) ObjectExists(ctx context.Context, objectKey string) (bool, error) {
